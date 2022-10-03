@@ -147,41 +147,37 @@ namespace Dissector
         /// <param name="baseAddressPtr"></param>
         /// <param name="offsets"></param>
         /// <returns></returns>
-        public unsafe float ReadMultiLevelFloat(IntPtr baseAddressPtr, params int[] offsets)
-        {
-            long bytesRead;
+              public static UInt64 GetCamera()
+      {
+            /* Read into the first entry in the list */
+            UInt64 address = Memory.Memory.ReadMemory<UInt64>(GOMAddress + 0x8);
 
-            IntPtr ptr = IntPtr.Zero;
-
-            var initialPtr = baseAddressPtr;
-            long lastAddress = 0;
-
-            float returnValue = 0;
-
-            foreach (var offset in offsets)
+            /* Loop until we hit tag 5, which is camera */
+            while (true)
             {
-                /* This is the last offset being read so we should go ahead and marshal the value to int and return it */
-                if (offset == offsets[offsets.Length - 1])
+                /* Read into the GameObject */
+                UInt64 game_object = Memory.Memory.ReadMemory<UInt64>((int)address + 0x10);
+
+                /* Read this object's tag */
+                Int16 tag = Memory.Memory.ReadMemory<Int16>((int)game_object + 0x54);
+
+                if (tag == 5)
                 {
-                    var nextLevelPtr = lastAddress == 0 ? baseAddressPtr : initialPtr;
-
-                    ptr = IntPtr.Add(nextLevelPtr, offset);
-
-                    returnValue = Read<float>(IntPtr.Add(nextLevelPtr, offset));
+                    List<int> dda = new List<int>();
+                    dda.Add(0x30);
+                    dda.Add(0x18);
+                    return Memory.Memory.ReadChain<UInt64>(game_object, dda); 
                 }
-                else
-                {
-                    var newValue = ReadMemory(IntPtr.Add(initialPtr, offset), 8, out bytesRead);
 
-                    lastAddress = BitConverter.ToInt64(newValue, 0);
-
-                    /* Update the initial pointer so we can read the next offset assuming it's not the last one */
-                    initialPtr = new IntPtr(lastAddress);
-                }
+                /* Read into the next entry */
+                address = Memory.Memory.ReadMemory<UInt64>((int)address + 0x8);
             }
 
-            return returnValue;
-        }
+            return address;
+      }
+
+    }
+}
 
         /// <summary>
         /// Allows us to pass in a "path" of pointers with the final one being the offset for the value we want to read as an int32
